@@ -1,0 +1,12 @@
+CompileFlags:
+  Add:
+    - -std=c++17
+    - -Idriver/src
+    - -Isrc
+    - -I../src
+    - -Idriver/third_party/openvr
+    - -Ithird_party/openvr
+    - -I../third_party/openvr
+    - -D_CRT_SECURE_NO_WARNINGS
+    - -DNOMINMAX
+    - -D_USE_MATH_DEFINES

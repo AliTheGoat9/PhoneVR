@@ -1,0 +1,74 @@
+# ==============================================================================
+# PhoneVR — Git Ignore Rules
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. C++ / CMake / Visual Studio Build Artifacts
+# ------------------------------------------------------------------------------
+build/
+driver/build/
+driver/*.exe
+driver/phonevr/bin/win64/*.lib
+driver/phonevr/bin/win64/*.exp
+*.obj
+*.o
+*.pdb
+*.ilk
+*.idb
+*.exp
+*.lib.recipe
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles/
+Testing/
+Makefile
+
+# ------------------------------------------------------------------------------
+# 2. Android & Gradle Outputs
+# ------------------------------------------------------------------------------
+android/.gradle/
+android/.kotlin/
+android/app/build/
+android/build/
+android/local.properties
+android/*.iml
+android/app/*.iml
+android/.idea/
+.gradle/
+*.apk
+*.aab
+
+# ------------------------------------------------------------------------------
+# 3. IDEs, Editors & Workspaces
+# ------------------------------------------------------------------------------
+.vs/
+.idea/
+*.suo
+*.user
+*.userosv
+*.sln.docstates
+.vscode/*
+!.vscode/settings.json
+!.vscode/c_cpp_properties.json
+
+# ------------------------------------------------------------------------------
+# 4. Large Binaries (> 100 MB GitHub Limit)
+# ------------------------------------------------------------------------------
+VDD.Control.25.7.23/VDD Control.exe
+
+# ------------------------------------------------------------------------------
+# 5. Runtime Captures & Logs
+# ------------------------------------------------------------------------------
+phonevr_capture_test.png
+*.log
+
+# ------------------------------------------------------------------------------
+# 6. Operating System Files
+# ------------------------------------------------------------------------------
+[Tt]humbs.db
+[Ee]hthumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+.DS_Store
+*.swp
+*~

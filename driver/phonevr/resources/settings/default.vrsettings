@@ -1,0 +1,25 @@
+{
+    "driver_phonevr":  {
+                           "serial_number":  "PHONEVR-0001",
+                           "model_number":  "PhoneVR",
+                           "udp_port":  5555,
+                           "phone_config_port":  5001,
+                           "window_x":  0,
+                           "window_y":  0,
+                           "window_width":  2992,
+                           "window_height":  1344,
+                           "render_scale":  1.0,
+                           "fov_h_deg":  100.0,
+                           "display_hz":  120.0,
+                           "latency_ms":  40.0,
+                           "ipd_mm":  63.0,
+                           "head_height_m":  1.2,
+                           "neck_model":  true,
+                           "neck_up_m":  0.075,
+                           "neck_forward_m":  0.08
+                       },
+    "steamvr":  {
+                    "forcedDriver":  "phonevr",
+                    "activateMultipleDrivers":  true
+                }
+}
