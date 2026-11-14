@@ -25,7 +25,7 @@ class Session(
     private val lock = Any()
     private var stopped = false
     private var link: StreamLink? = null
-    private var decoder: VideoDecoder? = null
+    @Volatile private var decoder: VideoDecoder? = null   // swapped on the config thread, read on the video thread
     private var tracker: HeadTracker? = null
     private var wifiLock: WifiManager.WifiLock? = null
     private var lastCfg: PcConfig? = null
@@ -51,7 +51,11 @@ class Session(
                 Log.w(TAG, "wifi lock: ${e.message}")
             }
             val t = HeadTracker(ctx, { b, n -> l.sendPose(b, n) }, { ipdMm }, landscapeRight)
-            if (!t.start()) { listener.onError("This phone has no rotation sensor."); return }
+            if (!t.start()) {
+                releaseLocked()   // don't leave the sockets and Wi-Fi lock open
+                listener.onError("This phone has no rotation sensor.")
+                return
+            }
             tracker = t
         }
     }
@@ -73,14 +77,17 @@ class Session(
     fun recenter() { tracker?.requestRecenter() }
 
     fun stop() {
-        synchronized(lock) {
-            stopped = true
-            tracker?.stop(); tracker = null
-            link?.stop(); link = null
-            decoder?.stop(); decoder = null
-            try { wifiLock?.release() } catch (_: Exception) { }
-            wifiLock = null
-        }
+        synchronized(lock) { releaseLocked() }
+    }
+
+    /** Caller holds [lock]. */
+    private fun releaseLocked() {
+        stopped = true
+        tracker?.stop(); tracker = null
+        link?.stop(); link = null
+        decoder?.stop(); decoder = null
+        try { wifiLock?.release() } catch (_: Exception) { }
+        wifiLock = null
     }
 
     private companion object { const val TAG = "PhoneVR" }

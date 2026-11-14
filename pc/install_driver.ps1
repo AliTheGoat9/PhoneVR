@@ -20,27 +20,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-
-function Find-VrPathReg {
-  $roots = @()
-  $steam = (Get-ItemProperty 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue).SteamPath
-  if ($steam) {
-    $steam = $steam -replace '/', '\'
-    $roots += $steam
-    $vdf = Join-Path $steam 'steamapps\libraryfolders.vdf'
-    if (Test-Path $vdf) {
-      Select-String -Path $vdf -Pattern '"path"\s+"([^"]+)"' | ForEach-Object {
-        $roots += ($_.Matches[0].Groups[1].Value -replace '\\\\', '\')
-      }
-    }
-  }
-  $roots += "${env:ProgramFiles(x86)}\Steam"
-  foreach ($r in ($roots | Select-Object -Unique)) {
-    $p = Join-Path $r 'steamapps\common\SteamVR\bin\win64\vrpathreg.exe'
-    if (Test-Path $p) { return $p }
-  }
-  return $null
-}
+. (Join-Path $PSScriptRoot 'phonevr_common.ps1')
 
 $vrpathreg = Find-VrPathReg
 if (-not $vrpathreg) {
@@ -52,7 +32,8 @@ if (-not $DriverPath) {
   $candidates = @(
     (Join-Path $PSScriptRoot '..\driver\build\package\phonevr'),
     (Join-Path $PSScriptRoot '..\driver\build\Release\package\phonevr'),
-    (Join-Path $PSScriptRoot 'phonevr')
+    (Join-Path $PSScriptRoot 'phonevr'),
+    (Join-Path $PSScriptRoot '..\driver\phonevr')   # prebuilt driver that ships with the project
   )
   foreach ($c in $candidates) {
     if (Test-Path (Join-Path $c 'bin\win64\driver_phonevr.dll')) { $DriverPath = (Resolve-Path $c).Path; break }

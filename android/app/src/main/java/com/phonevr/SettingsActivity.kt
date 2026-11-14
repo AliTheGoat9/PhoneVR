@@ -3,7 +3,9 @@ package com.phonevr
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.text.Editable
 import android.text.InputType
+import android.text.TextWatcher
 import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
@@ -43,7 +45,7 @@ class SettingsActivity : Activity() {
             setSingleLine()
         }
         root.addView(ip)
-        ip.setOnFocusChangeListener { _, _ -> s.pcIp = ip.text.toString().trim() }
+        ip.onEdited { s.pcIp = it.trim() }
 
         header("Eyes")
         slider("IPD (eye separation sent to SteamVR)", AppSettings.IPD_MIN, AppSettings.IPD_MAX, 0.5f, { s.ipdMm }, "mm") {
@@ -111,9 +113,17 @@ class SettingsActivity : Activity() {
             setText(initial.toString())
             inputType = InputType.TYPE_CLASS_NUMBER
             setSingleLine()
-            setOnFocusChangeListener { _, _ -> text.toString().toIntOrNull()?.let(onChange) }
+            onEdited { t -> t.toIntOrNull()?.let(onChange) }
         })
     }
+
+    /** Saves on every keystroke: tapping a button does not move the focus, so a focus listener can miss the last edit. */
+    private fun EditText.onEdited(onChange: (String) -> Unit) =
+        addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(e: Editable?) { onChange(e?.toString() ?: "") }
+        })
 
     /** Label + live value + SeekBar. [refresh] lets other sliders update this one (IPD drives lens separation). */
     private fun slider(label: String, min: Float, max: Float, step: Float, get: () -> Float, unit: String, onChange: (Float) -> Unit) {
