@@ -9,7 +9,6 @@
   <a href="#-technical-specifications"><img src="https://img.shields.io/badge/Refresh_Rate-120_Hz-brightgreen?style=for-the-badge" alt="Refresh Rate"></a>
   <a href="#-architecture"><img src="https://img.shields.io/badge/SteamVR-OpenVR_Driver-ff69b4?style=for-the-badge&logo=steam" alt="SteamVR"></a>
   <a href="#-architecture"><img src="https://img.shields.io/badge/Video-H.265_%2F_HEVC-orange?style=for-the-badge" alt="H.265"></a>
-  <a href="#-license"><img src="https://img.shields.io/badge/License-BSD--3--Clause-lightgrey?style=for-the-badge" alt="License"></a>
 </p>
 
 ---
@@ -105,9 +104,11 @@ PhoneVR/
 │   └── third_party/openvr/         # Valve OpenVR SDK headers (v1.26.7)
 ├── 📁 pc/                          # Streaming & Network Scripts
 │   ├── phonevr_server.ps1          # Master launcher & FFmpeg orchestrator
+│   ├── phonevr_common.ps1          # Shared helpers: find SteamVR, find the virtual display on any GPU, encoder settings
+│   ├── start_stream.ps1            # Stream only (no SteamVR checks), with -ListDisplays / -TestCapture
 │   ├── install_driver.ps1          # SteamVR driver registration & firewall setup
 │   ├── usb_tether.ps1              # Automated USB tethering network adapter setup
-│   └── capture_test.ps1            # Diagnostic desktop capture verification
+│   └── capture_test.ps1            # Saves one frame per capturable screen
 ├── 📁 VDD.Control.25.7.23/         # MikeTheTech Virtual Display Driver (2992×1344@120Hz)
 │   ├── install_virtual_monitor.bat # Automated virtual monitor setup script
 │   └── Dependencies/               # devcon.exe and custom resolution profiles
@@ -164,13 +165,16 @@ cd ..\pc
 
 ---
 
-### 3. Setup Headless Virtual Display (Recommended)
+### 3. Set Up the Virtual Display (Required)
 
-To allow SteamVR to render in native **2992×1344 @ 120Hz** without requiring a physical monitor with those exact specs:
+SteamVR draws the headset image into a window, and that window needs a screen of its own at exactly **2992×1344**. Without one, the window lands on your normal desktop and the phone just shows a mirror of your monitor.
 
 1. Navigate to `VDD.Control.25.7.23\`
-2. Right-click `install_virtual_monitor.bat` → **Run as Administrator**.
-3. Open Windows **Display Settings** and verify the new virtual display is active at **2992×1344 @ 120Hz**.
+2. Double-click `install_virtual_monitor.bat` and accept the admin prompt. On laptops with two GPUs it puts the virtual display on the dedicated GPU.
+3. In Windows **Settings → System → Display**, select the new display, choose **Extend these displays** (not *Duplicate*), and set it to **2992×1344** at **120 Hz**.
+4. Restart SteamVR.
+
+The driver finds the 2992×1344 display by itself when SteamVR starts and puts the headset window there (`auto_display` in `default.vrsettings`). The streaming scripts find the same display on whichever GPU it is attached to and capture only that screen.
 
 ---
 
@@ -222,8 +226,8 @@ Alternatively, launch from PowerShell:
 Verify the system components independently before flying:
 
 ```bash
-# 1. Pose maths and UDP loopback unit test
-g++ -Isrc driver/tests/test_pose.cpp -o test_pose
+# 1. Pose maths unit test (run from the project root)
+g++ -std=c++17 -D_USE_MATH_DEFINES -Idriver/src driver/tests/test_pose.cpp -o test_pose
 ./test_pose
 
 # 2. Android H.265 depacketizer byte-accuracy test
@@ -233,8 +237,28 @@ cd android/tests-jvm
 
 ---
 
+The `tests-jvm` script also builds `driver/tests/test_link.cpp` and checks the UDP pose/config packets between the Kotlin and C++ code.
+
+```powershell
+# 3. See exactly which screens ffmpeg can capture (one PNG per screen)
+.\pc\capture_test.ps1
+```
+
+---
+
+## 🛠️ Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| **The phone shows my laptop/monitor desktop instead of VR** | There is no 2992×1344 virtual display, so a normal monitor got streamed. Do step 3 above. `phonevr_server.ps1` now refuses to stream if it can't find one and lists the screens it can see. |
+| Virtual display installed but the phone still shows a desktop | SteamVR was started before the display existed. Restart SteamVR (the server script offers to). Also check the display is set to *Extend*, not *Duplicate*. |
+| "Waiting for the phone" never ends | The phone isn't reaching UDP 5555. Check the PC address in the app, the firewall rule (`install_driver.ps1` as admin), and that the network is *Private*. |
+| Stream starts to an old phone address | Fixed: the driver refreshes `phone_ip.txt` every second while the phone is connected, and the scripts ignore it once it is older than 5 s. |
+
+---
+
 ## 📜 Licenses & Attribution
 
-- **PhoneVR**: Released under the MIT / Project License.
+- **PhoneVR**: no license file has been added yet. Until the author adds one, the PhoneVR code is all rights reserved.
 - **Valve OpenVR**: OpenVR driver headers released under [Valve BSD-3-Clause](driver/third_party/openvr/LICENSE).
 - **Virtual Display Driver**: MikeTheTech Virtual Display Driver.

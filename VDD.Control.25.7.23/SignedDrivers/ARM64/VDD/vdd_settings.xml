@@ -17,6 +17,11 @@
 	</global>
     <resolutions>
         <resolution>
+            <width>2992</width>
+            <height>1344</height>
+            <refresh_rate>120</refresh_rate>
+        </resolution>
+        <resolution>
             <width>800</width>
             <height>600</height>
             <refresh_rate>30</refresh_rate>

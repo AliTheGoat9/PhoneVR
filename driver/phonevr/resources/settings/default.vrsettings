@@ -8,6 +8,7 @@
                            "window_y":  0,
                            "window_width":  2992,
                            "window_height":  1344,
+                           "auto_display":  true,
                            "render_scale":  1.0,
                            "fov_h_deg":  100.0,
                            "display_hz":  120.0,

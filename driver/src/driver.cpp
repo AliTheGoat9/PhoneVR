@@ -30,6 +30,13 @@
 #include <thread>
 
 #if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h> // after udp_link.h, so winsock2.h comes first
+#endif
+
+#if defined(_WIN32)
 #define HMD_DLL_EXPORT extern "C" __declspec(dllexport)
 #else
 #define HMD_DLL_EXPORT extern "C" __attribute__((visibility("default")))
@@ -79,6 +86,11 @@ struct DriverConfig {
   int udpPort = 5555;
   int phoneConfigPort = 5001;
   int windowX = 0, windowY = 0, windowW = 2992, windowH = 1344;
+  // Place the headset window on the monitor whose resolution is exactly
+  // windowW x windowH (the virtual display), ignoring window_x/window_y.
+  bool autoDisplay = true;
+  bool displayFound = false;
+  std::string displayName;
   float renderScale = 1.0f;
   float fovHDeg = 100.0f;
   float displayHz = 120.0f;
@@ -101,6 +113,39 @@ struct DriverConfig {
   }
 };
 
+// Looks for an attached monitor running at exactly windowW x windowH and moves
+// the headset window onto it. Uses the display modes (physical pixels, real
+// desktop coordinates), so Windows DPI scaling does not matter.
+void FindHeadsetDisplay(DriverConfig &c) {
+#if defined(_WIN32)
+  DISPLAY_DEVICEW dev{};
+  dev.cb = sizeof(dev);
+  for (DWORD i = 0; EnumDisplayDevicesW(nullptr, i, &dev, 0); i++) {
+    if (dev.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP) {
+      DEVMODEW mode{};
+      mode.dmSize = sizeof(mode);
+      if (EnumDisplaySettingsExW(dev.DeviceName, ENUM_CURRENT_SETTINGS, &mode,
+                                 0) &&
+          static_cast<int>(mode.dmPelsWidth) == c.windowW &&
+          static_cast<int>(mode.dmPelsHeight) == c.windowH) {
+        c.windowX = mode.dmPosition.x;
+        c.windowY = mode.dmPosition.y;
+        c.displayFound = true;
+        char name[64] = {0};
+        WideCharToMultiByte(CP_UTF8, 0, dev.DeviceName, -1, name, sizeof(name),
+                            nullptr, nullptr);
+        c.displayName = name;
+        return;
+      }
+    }
+    dev = DISPLAY_DEVICEW{};
+    dev.cb = sizeof(dev);
+  }
+#else
+  (void)c;
+#endif
+}
+
 DriverConfig LoadConfig() {
   DriverConfig c;
   c.serial = GetStringSetting("serial_number", c.serial.c_str());
@@ -121,6 +166,9 @@ DriverConfig LoadConfig() {
   c.neckModel = GetBoolSetting("neck_model", c.neckModel);
   c.neckUpM = GetFloatSetting("neck_up_m", c.neckUpM);
   c.neckForwardM = GetFloatSetting("neck_forward_m", c.neckForwardM);
+  c.autoDisplay = GetBoolSetting("auto_display", c.autoDisplay);
+  if (c.autoDisplay)
+    FindHeadsetDisplay(c);
   return c;
 }
 
@@ -138,9 +186,17 @@ std::filesystem::path StateDir() {
   return base;
 }
 
+// Written atomically (temp file + rename) so the script never reads a
+// half-written file.
 void WritePhoneIp(const std::string &ip) {
-  std::ofstream f(StateDir() / "phone_ip.txt", std::ios::trunc);
-  f << ip << "\n";
+  const auto dir = StateDir();
+  const auto tmp = dir / "phone_ip.txt.tmp";
+  {
+    std::ofstream f(tmp, std::ios::trunc);
+    f << ip << "\n";
+  }
+  std::error_code ec;
+  std::filesystem::rename(tmp, dir / "phone_ip.txt", ec);
 }
 } // namespace
 
@@ -247,6 +303,10 @@ public:
         [this](const phonevr::PosePacket &p) { OnPosePacket(p); },
         [this](const std::string &ip) {
           Log("phone connected from %s", ip.c_str());
+          {
+            std::lock_guard<std::mutex> lock(peerIpMutex_);
+            peerIp_ = ip;
+          }
           WritePhoneIp(ip);
           autoRecenter_ = true;
           sendConfigNow_ = true;
@@ -259,6 +319,17 @@ public:
           "%.0f deg",
           c_.udpPort, c_.windowW, c_.windowH, c_.windowX, c_.windowY,
           c_.fovHDeg);
+
+    if (c_.displayFound)
+      Log("headset window placed on %s (%dx%d at %d,%d)",
+          c_.displayName.c_str(), c_.windowW, c_.windowH, c_.windowX,
+          c_.windowY);
+    else if (c_.autoDisplay)
+      Log("WARNING: no %dx%d monitor found. The headset window will sit on "
+          "top of your normal desktop and the phone will show a desktop "
+          "mirror. Install the virtual display "
+          "(VDD.Control.25.7.23\\install_virtual_monitor.bat).",
+          c_.windowW, c_.windowH);
 
     active_ = true;
     thread_ = std::thread(&PhoneHmd::PoseThread, this);
@@ -424,6 +495,19 @@ private:
           now - lastConfig > std::chrono::seconds(1)) {
         SendConfig();
         lastConfig = now;
+        // Heartbeat: while poses keep arriving, refresh phone_ip.txt once a
+        // second. The streaming script treats an old file as "no phone".
+        const uint64_t received = link_.PacketsReceived();
+        if (received != lastReceived_) {
+          lastReceived_ = received;
+          std::string ip;
+          {
+            std::lock_guard<std::mutex> lock(peerIpMutex_);
+            ip = peerIp_;
+          }
+          if (!ip.empty())
+            WritePhoneIp(ip);
+        }
       }
     }
   }
@@ -451,6 +535,9 @@ private:
   std::atomic<bool> autoRecenter_{true};
   std::atomic<bool> sendConfigNow_{false};
   bool prevRecenterFlag_ = false; // UDP thread only
+  std::mutex peerIpMutex_;
+  std::string peerIp_;
+  uint64_t lastReceived_ = 0; // PoseThread only
   std::thread thread_;
 };
 

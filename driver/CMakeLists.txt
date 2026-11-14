@@ -19,7 +19,7 @@ add_library(driver_phonevr SHARED src/driver.cpp)
 target_include_directories(driver_phonevr PRIVATE third_party/openvr src)
 
 if(WIN32)
-  target_link_libraries(driver_phonevr PRIVATE ws2_32)
+  target_link_libraries(driver_phonevr PRIVATE ws2_32 user32)
   target_compile_definitions(driver_phonevr PRIVATE _CRT_SECURE_NO_WARNINGS NOMINMAX)
 else()
   set_target_properties(driver_phonevr PROPERTIES PREFIX "" CXX_VISIBILITY_PRESET hidden)
